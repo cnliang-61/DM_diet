@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飲食照片記錄</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --surface2: #f0ede8;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --text: #1a1917;
+    --text2: #6b6860;
+    --text3: #a09c97;
+    --green: #1D9E75;
+    --green-bg: #e1f5ee;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #181715;
+      --surface: #222120;
+      --surface2: #2c2b29;
+      --border: rgba(255,255,255,0.09);
+      --border2: rgba(255,255,255,0.18);
+      --text: #f0ede8;
+      --text2: #a09c97;
+      --text3: #6b6860;
+      --green-bg: #0a3326;
+    }
+  }
+
+  body {
+    font-family: -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0 0 3rem;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  header .sub {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 1px;
+  }
+
+  .main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem;
+  }
+
+  /* ── Date bar ── */
+  .date-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1.25rem;
+  }
+
+  .date-bar input[type=date] {
+    flex: 1;
+    font-size: 15px;
+    font-family: inherit;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    background: var(--surface);
+    color: var(--text);
+    -webkit-appearance: none;
+  }
+
+  .nav-btn {
+    width: 34px; height: 34px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text2);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .nav-btn:hover { background: var(--surface2); }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 1.25rem;
+  }
+
+  .tab {
+    font-size: 13px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: inherit;
+  }
+
+  .tab.active {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: var(--border2);
+    font-weight: 600;
+  }
+
+  .badge-pill {
+    display: inline-block;
+    background: var(--surface2);
+    border-radius: 10px;
+    font-size: 11px;
+    padding: 1px 6px;
+    color: var(--text2);
+    margin-left: 4px;
+  }
+
+  /* ── Meal grid ── */
+  .section-label {
+    font-size: 12px;
+    color: var(--text3);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .meal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+
+  @media (max-width: 400px) {
+    .meal-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .meal-card {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .meal-card:hover { border-color: var(--border2); }
+  .meal-card:active { transform: scale(0.97); }
+
+  .meal-thumb {
+    width: 100%; aspect-ratio: 1;
+    object-fit: cover; display: block;
+  }
+
+  .meal-placeholder {
+    width: 100%; aspect-ratio: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 6px;
+    background: var(--surface2);
+  }
+
+  .plus-ring {
+    width: 30px; height: 30px;
+    border: 1.5px solid var(--border2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: var(--text3); line-height: 1;
+  }
+
+  .meal-meta {
+    padding: 6px 8px 7px;
+    border-top: 0.5px solid var(--border);
+    background: var(--surface);
+  }
+
+  .meal-name {
+    font-size: 12px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .meal-count {
+    font-size: 10px; color: var(--text3);
+    margin-top: 1px;
+  }
+
+  .img-badge {
+    position: absolute; top: 5px; right: 5px;
+    min-width: 18px; height: 18px;
+    border-radius: 9px;
+    background: var(--green);
+    color: #fff;
+    font-size: 10px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px;
+  }
+
+  .del-btn {
+    position: absolute; top: 5px; left: 5px;
+    width: 22px; height: 22px;
+    border-radius: 11px;
+    background: rgba(0,0,0,0.5);
+    border: none; cursor: pointer;
+    color: #fff; font-size: 14px; line-height: 1;
+    display: none; align-items: center; justify-content: center;
+  }
+  .meal-card:hover .del-btn { display: flex; }
+
+  /* ── Note area ── */
+  .note-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 1.5rem;
+  }
+
+  .note-card textarea {
+    width: 100%;
+    font-size: 14px;
+    font-family: inherit;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    resize: none;
+    min-height: 60px;
+    outline: none;
+    line-height: 1.6;
+  }
+
+  .note-card textarea::placeholder { color: var(--text3); }
+
+  .note-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 6px;
+    border-top: 0.5px solid var(--border);
+    padding-top: 8px;
+  }
+
+  .save-btn {
+    font-size: 13px;
+    font-family: inherit;
+    padding: 5px 16px;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .save-btn:hover { background: var(--bg); }
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.25rem;
+  }
+
+  .stat-chip {
+    flex: 1;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--green);
+  }
+
+  .stat-lbl {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 1px;
+  }
+
+  /* ── Gallery ── */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 6px;
+  }
+
+  .g-item {
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 0.5px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+  }
+
+  .g-item img {
+    width: 100%; aspect-ratio: 1; object-fit: cover; display: block;
+  }
+
+  .g-cap {
+    font-size: 10px;
+    color: var(--text3);
+    padding: 3px 6px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text3);
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  /* ── Lightbox ── */
+  #lightbox {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.88);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img {
+    max-width: 92vw;
+    max-height: 80vh;
+    border-radius: var(--radius);
+    object-fit: contain;
+  }
+  #lightbox-close {
+    position: absolute; top: 16px; right: 16px;
+    width: 36px; height: 36px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.15);
+    border: none; cursor: pointer;
+    color: #fff; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #lightbox-label {
+    color: rgba(255,255,255,0.65);
+    font-size: 13px;
+  }
+
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="sub">每日飲食</div>
+    <h1>飲食照片記錄</h1>
+  </div>
+  <div style="font-size:22px">🥗</div>
+</header>
+
+<div class="main">
+
+  <div class="date-bar">
+    <button class="nav-btn" id="prevDay" title="前一天">‹</button>
+    <input type="date" id="datePicker">
+    <button class="nav-btn" id="nextDay" title="後一天">›</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="setView('upload')">今日記錄</button>
+    <button class="tab" onclick="setView('gallery')">所有記錄 <span class="badge-pill" id="totalCount">0</span></button>
+  </div>
+
+  <!-- Upload view -->
+  <div id="uploadView">
+    <div class="section-label">點擊餐次上傳照片</div>
+    <div class="meal-grid" id="mealGrid"></div>
+
+    <div class="section-label">今日備註</div>
+    <div class="note-card">
+      <textarea id="noteInput" placeholder="熱量、感受、特別的食物…任何想記錄的都可以寫在這裡"></textarea>
+      <div class="note-footer">
+        <button class="save-btn" id="saveNoteBtn" onclick="saveNote()">儲存備註</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gallery view -->
+  <div id="galleryView" style="display:none">
+    <div class="stats-bar">
+      <div class="stat-chip">
+        <div class="stat-num" id="statDays">0</div>
+        <div class="stat-lbl">記錄天數</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-num" id="statPhotos">0</div>
+        <div class="stat-lbl">張照片</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-num" id="statMeals">0</div>
+        <div class="stat-lbl">餐次記錄</div>
+      </div>
+    </div>
+    <div class="gallery-grid" id="galleryGrid"></div>
+    <div class="empty-state" id="galleryEmpty">尚未上傳任何照片<br><small>回到「今日記錄」開始記錄吧</small></div>
+  </div>
+
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button id="lightbox-close" onclick="closeLightbox()">×</button>
+  <img id="lightbox-img" src="" alt="">
+  <div id="lightbox-label"></div>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" multiple>
+
+<script>
+const MEALS = [
+  { key: 'breakfast', label: '早餐',   icon: '🌅' },
+  { key: 'lunch',     label: '午餐',   icon: '☀️' },
+  { key: 'dinner',    label: '晚餐',   icon: '🌙' },
+  { key: 'snack1',    label: '上午點心', icon: '🍎' },
+  { key: 'snack2',    label: '下午點心', icon: '🍪' },
+  { key: 'supper',    label: '消夜',   icon: '🌃' },
+];
+
+let db = {};
+try { db = JSON.parse(localStorage.getItem('mealLog_v1') || '{}'); } catch(e) {}
+
+let currentDate = '';
+let currentMealKey = '';
+let currentView = 'upload';
+
+function saveDB() {
+  try { localStorage.setItem('mealLog_v1', JSON.stringify(db)); } catch(e) {}
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+
+function getDay(date) {
+  if (!db[date]) db[date] = {};
+  return db[date];
+}
+
+// ── Init ──
+const dp = document.getElementById('datePicker');
+dp.value = todayStr();
+currentDate = dp.value;
+dp.addEventListener('change', () => { currentDate = dp.value; renderMeals(); loadNote(); });
+
+document.getElementById('prevDay').onclick = () => {
+  const d = new Date(currentDate); d.setDate(d.getDate()-1);
+  dp.value = d.toISOString().slice(0,10); currentDate = dp.value;
+  renderMeals(); loadNote();
+};
+document.getElementById('nextDay').onclick = () => {
+  const d = new Date(currentDate); d.setDate(d.getDate()+1);
+  dp.value = d.toISOString().slice(0,10); currentDate = dp.value;
+  renderMeals(); loadNote();
+};
+
+renderMeals();
+loadNote();
+updateCount();
+
+// ── Views ──
+function setView(v) {
+  currentView = v;
+  document.getElementById('uploadView').style.display = v === 'upload' ? '' : 'none';
+  document.getElementById('galleryView').style.display = v === 'gallery' ? '' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0&&v==='upload')||(i===1&&v==='gallery'));
+  });
+  if (v === 'gallery') renderGallery();
+}
+
+// ── Render meals ──
+function renderMeals() {
+  const grid = document.getElementById('mealGrid');
+  const day = getDay(currentDate);
+  grid.innerHTML = '';
+
+  MEALS.forEach(m => {
+    const imgs = day[m.key] || [];
+    const card = document.createElement('div');
+    card.className = 'meal-card';
+
+    if (imgs.length > 0) {
+      const img = document.createElement('img');
+      img.className = 'meal-thumb';
+      img.src = imgs[imgs.length-1];
+      img.alt = m.label;
+      img.onclick = (e) => { e.stopPropagation(); openLightbox(imgs[imgs.length-1], m.label); };
+      card.appendChild(img);
+
+      if (imgs.length > 1) {
+        const b = document.createElement('div');
+        b.className = 'img-badge';
+        b.textContent = imgs.length;
+        card.appendChild(b);
+      }
+
+      const del = document.createElement('button');
+      del.className = 'del-btn';
+      del.innerHTML = '×';
+      del.title = '刪除最後一張';
+      del.onclick = (e) => { e.stopPropagation(); removePhoto(m.key); };
+      card.appendChild(del);
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'meal-placeholder';
+      ph.innerHTML = `<div class="plus-ring">+</div>`;
+      card.appendChild(ph);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'meal-meta';
+    meta.innerHTML = `<div class="meal-name">${m.icon} ${m.label}</div>
+      <div class="meal-count">${imgs.length > 0 ? imgs.length + ' 張照片' : '尚未記錄'}</div>`;
+    card.appendChild(meta);
+
+    card.onclick = () => openPicker(m.key);
+    grid.appendChild(card);
+  });
+}
+
+// ── File picker ──
+function openPicker(mealKey) {
+  currentMealKey = mealKey;
+  document.getElementById('fileInput').click();
+}
+
+document.getElementById('fileInput').addEventListener('change', function() {
+  const files = Array.from(this.files);
+  if (!files.length) return;
+  const day = getDay(currentDate);
+  if (!day[currentMealKey]) day[currentMealKey] = [];
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      day[currentMealKey].push(e.target.result);
+      loaded++;
+      if (loaded === files.length) { saveDB(); renderMeals(); updateCount(); }
+    };
+    reader.readAsDataURL(file);
+  });
+  this.value = '';
+});
+
+function removePhoto(mealKey) {
+  const day = getDay(currentDate);
+  if (day[mealKey] && day[mealKey].length > 0) {
+    day[mealKey].pop();
+    if (day[mealKey].length === 0) delete day[mealKey];
+  }
+  saveDB(); renderMeals(); updateCount();
+}
+
+// ── Note ──
+function loadNote() {
+  const day = getDay(currentDate);
+  document.getElementById('noteInput').value = day['_note'] || '';
+}
+
+function saveNote() {
+  const note = document.getElementById('noteInput').value.trim();
+  const day = getDay(currentDate);
+  if (note) day['_note'] = note; else delete day['_note'];
+  saveDB();
+  const btn = document.getElementById('saveNoteBtn');
+  btn.textContent = '已儲存 ✓';
+  setTimeout(() => btn.textContent = '儲存備註', 1800);
+}
+
+// ── Count ──
+function updateCount() {
+  let totalPhotos = 0, totalMeals = 0;
+  const days = Object.keys(db);
+  days.forEach(date => {
+    MEALS.forEach(m => {
+      const imgs = db[date][m.key] || [];
+      if (imgs.length) { totalMeals++; totalPhotos += imgs.length; }
+    });
+  });
+  document.getElementById('totalCount').textContent = totalPhotos;
+  document.getElementById('statDays').textContent = days.filter(d =>
+    MEALS.some(m => (db[d][m.key]||[]).length > 0)
+  ).length;
+  document.getElementById('statPhotos').textContent = totalPhotos;
+  document.getElementById('statMeals').textContent = totalMeals;
+}
+
+// ── Gallery ──
+function renderGallery() {
+  const grid = document.getElementById('galleryGrid');
+  const empty = document.getElementById('galleryEmpty');
+  grid.innerHTML = '';
+  let hasAny = false;
+
+  const sortedDates = Object.keys(db).sort().reverse();
+  sortedDates.forEach(date => {
+    const day = db[date];
+    MEALS.forEach(m => {
+      (day[m.key] || []).forEach((src, i) => {
+        hasAny = true;
+        const item = document.createElement('div');
+        item.className = 'g-item';
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = m.label;
+        img.loading = 'lazy';
+        const cap = document.createElement('div');
+        cap.className = 'g-cap';
+        cap.textContent = date.slice(5) + ' ' + m.icon + m.label;
+        item.appendChild(img);
+        item.appendChild(cap);
+        item.onclick = () => openLightbox(src, date + ' ' + m.label);
+        grid.appendChild(item);
+      });
+    });
+  });
+
+  empty.style.display = hasAny ? 'none' : '';
+  updateCount();
+}
+
+// ── Lightbox ──
+function openLightbox(src, label) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox-label').textContent = label;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
+}
+document.getElementById('lightbox').addEventListener('click', function(e) {
+  if (e.target === this) closeLightbox();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+</script>
+</body>
+</html>
