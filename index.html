@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>飲食照片紀錄</title>
+  <title>智慧飲食紀錄</title>
   <style>
     body { font-family: Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; }
     .container { max-width:900px; margin:auto; }
@@ -15,27 +15,25 @@
     button:hover { background:#1d4ed8; }
     img { width:100%; max-height:400px; object-fit:contain; background:#f1f5f9; border-radius:12px; margin-top:10px; border: 1px solid #e2e8f0; }
     .delete { background:#ef4444; margin-top: 15px; }
-    .delete:hover { background:#dc2626; }
     .time { font-size:14px; color:#64748b; margin-top:8px; display: flex; align-items: center; gap: 4px; }
     .no-data { text-align:center; color:#94a3b8; padding: 40px 0; }
-    /* 優化手機端體驗 */
-    @media (max-width: 600px) {
-      body { padding: 10px; }
-      .card { padding: 15px; }
-    }
+    .highlight-box { border-left: 5px solid #2563eb; background: #eff6ff; }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>飲食照片紀錄</h1>
+  <h1>智慧飲食紀錄系統</h1>
   
-  <div class="card">
-    <label for="datePicker">📅 紀錄日期</label>
-    <input type="date" id="datePicker">
-  </div>
+  <div class="card highlight-box">
+    <h2 style="margin-top:0;">新增紀錄</h2>
+    <label for="photoInput">📷 上傳食物照片 (自動辨識日期)</label>
+    <input type="file" id="photoInput" accept="image/*">
+    
+    <div id="previewContainer" style="display:none;">
+      <div id="previewTime" class="time" style="color: #2563eb; font-weight: bold;"></div>
+      <img id="preview">
+    </div>
 
-  <div class="card" style="border-left: 5px solid #2563eb;">
-    <h2 style="margin-top:0;">新增飲食紀錄</h2>
     <select id="mealType">
       <option>早餐</option>
       <option>午餐</option>
@@ -44,21 +42,18 @@
       <option>宵夜</option>
       <option>其他</option>
     </select>
-    <input type="text" id="customType" placeholder="請手動輸入餐別 (如：下午茶)" style="display:none;">
+    <input type="text" id="customType" placeholder="請手動輸入餐別" style="display:none;">
     
-    <label for="photoInput" style="display:block; margin-top:15px;">📷 上傳食物照片</label>
-    <input type="file" id="photoInput" accept="image/*">
-    
-    <div id="previewContainer" style="display:none;">
-      <div id="previewTime" class="time"></div>
-      <img id="preview">
-    </div>
-    
-    <textarea id="note" rows="3" placeholder="備註（例如：飯前血糖、食物組成、份量等...）"></textarea>
-    <button onclick="addEntry()">➕ 新增紀錄並儲存</button>
+    <textarea id="note" rows="3" placeholder="備註（份量、血糖等...）"></textarea>
+    <button onclick="addEntry()">➕ 儲存紀錄</button>
   </div>
 
-  <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+  <hr style="border: 0; border-top: 2px dashed #e2e8f0; margin: 30px 0;">
+
+  <div class="card">
+    <label for="datePicker">📅 檢視日期清單</label>
+    <input type="date" id="datePicker">
+  </div>
   
   <div id="entries"></div>
 </div>
@@ -68,7 +63,8 @@ let db;
 const DB_NAME = "DietRecordDB";
 const STORE_NAME = "meals";
 
-// --- 資料庫初始化 ---
+// 初始化資料庫
 const request = indexedDB.open(DB_NAME, 1);
 request.onupgradeneeded = (e) => {
-  db = e.target.result
+  db = e.target.result;
+  if (!db.objectStoreNames.
