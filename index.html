@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智慧飲食紀錄</title>
+  <title>智慧飲食紀錄系統</title>
   <style>
     body { font-family: Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; }
     .container { max-width:900px; margin:auto; }
@@ -15,7 +15,7 @@
     button:hover { background:#1d4ed8; }
     img { width:100%; max-height:400px; object-fit:contain; background:#f1f5f9; border-radius:12px; margin-top:10px; border: 1px solid #e2e8f0; }
     .delete { background:#ef4444; margin-top: 15px; }
-    .time { font-size:14px; color:#64748b; margin-top:8px; display: flex; align-items: center; gap: 4px; }
+    .time { font-size:14px; color:#2563eb; font-weight:bold; margin-top:8px; }
     .no-data { text-align:center; color:#94a3b8; padding: 40px 0; }
     .highlight-box { border-left: 5px solid #2563eb; background: #eff6ff; }
   </style>
@@ -26,29 +26,23 @@
   
   <div class="card highlight-box">
     <h2 style="margin-top:0;">新增紀錄</h2>
-    <label for="photoInput">📷 上傳食物照片 (自動辨識日期)</label>
-    <input type="file" id="photoInput" accept="image/*">
+    <label for="photoInput">📷 上傳食物照片 (支援 jfif/jpg/png/webp)</label>
+    <input type="file" id="photoInput" accept=".jpg, .jpeg, .png, .webp, .jfif, image/*">
     
     <div id="previewContainer" style="display:none;">
-      <div id="previewTime" class="time" style="color: #2563eb; font-weight: bold;"></div>
+      <div id="previewTime" class="time"></div>
       <img id="preview">
     </div>
 
     <select id="mealType">
-      <option>早餐</option>
-      <option>午餐</option>
-      <option>晚餐</option>
-      <option>點心</option>
-      <option>宵夜</option>
-      <option>其他</option>
+      <option>早餐</option><option>午餐</option><option>晚餐</option>
+      <option>點心</option><option>宵夜</option><option>其他</option>
     </select>
     <input type="text" id="customType" placeholder="請手動輸入餐別" style="display:none;">
     
     <textarea id="note" rows="3" placeholder="備註（份量、血糖等...）"></textarea>
     <button onclick="addEntry()">➕ 儲存紀錄</button>
   </div>
-
-  <hr style="border: 0; border-top: 2px dashed #e2e8f0; margin: 30px 0;">
 
   <div class="card">
     <label for="datePicker">📅 檢視日期清單</label>
@@ -67,4 +61,133 @@ const STORE_NAME = "meals";
 const request = indexedDB.open(DB_NAME, 1);
 request.onupgradeneeded = (e) => {
   db = e.target.result;
-  if (!db.objectStoreNames.
+  if (!db.objectStoreNames.contains(STORE_NAME)) {
+    const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
+    store.createIndex("date", "date", { unique: false });
+  }
+};
+request.onsuccess = (e) => {
+  db = e.target.result;
+  const today = new Date().toLocaleDateString('sv-SE');
+  document.getElementById('datePicker').value = today;
+  loadEntries(today);
+};
+
+document.getElementById('datePicker').addEventListener('change', (e) => loadEntries(e.target.value));
+document.getElementById('mealType').addEventListener('change', function() {
+  document.getElementById('customType').style.display = this.value === '其他' ? 'block' : 'none';
+});
+
+let currentPhoto = '';
+let currentPhotoDate = '';
+let currentPhotoFullTime = '';
+
+// 修改後的人性化照片讀取 logic
+document.getElementById('photoInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // 讀取檔案修改日期
+  const fileDate = new Date(file.lastModified);
+  currentPhotoDate = fileDate.toLocaleDateString('sv-SE');
+  currentPhotoFullTime = fileDate.toLocaleString('zh-TW');
+
+  const reader = new FileReader();
+  
+  reader.onloadstart = () => {
+    console.log("開始讀取檔案...");
+  };
+
+  reader.onload = function(evt) {
+    currentPhoto = evt.target.result;
+    document.getElementById('preview').src = currentPhoto;
+    document.getElementById('previewContainer').style.display = 'block';
+    document.getElementById('previewTime').innerText = '🕒 辨識到照片時間：' + currentPhotoFullTime;
+    
+    // 自動切換日期
+    document.getElementById('datePicker').value = currentPhotoDate;
+    loadEntries(currentPhotoDate);
+  };
+
+  reader.onerror = function() {
+    alert("照片讀取失敗，請嘗試換成一般 JPG 或 PNG 格式。");
+  };
+
+  reader.readAsDataURL(file);
+});
+
+function addEntry() {
+  if (!currentPhoto) {
+    alert("請先成功上傳照片再按儲存。");
+    return;
+  }
+  
+  const mealType = document.getElementById('mealType').value;
+  const customType = document.getElementById('customType').value;
+  const note = document.getElementById('note').value;
+  const type = mealType === '其他' ? customType : mealType;
+
+  const newEntry = {
+    id: Date.now(),
+    date: currentPhotoDate,
+    type: type,
+    note: note,
+    photo: currentPhoto,
+    time: currentPhotoFullTime
+  };
+
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  const store = transaction.objectStore(STORE_NAME);
+  const addRequest = store.add(newEntry);
+
+  addRequest.onsuccess = () => {
+    alert(`已儲存至 ${currentPhotoDate}`);
+    resetForm();
+    loadEntries(currentPhotoDate);
+  };
+}
+
+function loadEntries(date) {
+  const transaction = db.transaction([STORE_NAME], "readonly");
+  const store = transaction.objectStore(STORE_NAME);
+  const index = store.index("date");
+  const request = index.getAll(IDBKeyRange.only(date));
+
+  request.onsuccess = () => {
+    const results = request.result;
+    const div = document.getElementById('entries');
+    if (results.length === 0) {
+      div.innerHTML = `<div class="no-data">📭 ${date} 目前沒有紀錄</div>`;
+      return;
+    }
+    results.sort((a, b) => b.id - a.id);
+    div.innerHTML = `<h3>📅 ${date} 的歷史清單</h3>` + results.map(e => `
+      <div class="card">
+        <strong>${e.type}</strong>
+        <div class="time">🕒 拍攝於 ${e.time}</div>
+        <img src="${e.photo}">
+        <p style="white-space: pre-wrap; background:#f8fafc; padding:10px; border-radius:8px;">${e.note || '無備註'}</p>
+        <button class="delete" onclick="deleteEntry(${e.id})">🗑️ 刪除</button>
+      </div>
+    `).join('');
+  };
+}
+
+function deleteEntry(id) {
+  if (!confirm("確定刪除？")) return;
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  transaction.objectStore(STORE_NAME).delete(id);
+  transaction.oncomplete = () => loadEntries(document.getElementById('datePicker').value);
+}
+
+function resetForm() {
+  document.getElementById('note').value = '';
+  document.getElementById('photoInput').value = '';
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('customType').value = '';
+  document.getElementById('mealType').value = '早餐';
+  currentPhoto = '';
+}
+</script>
+</body>
+</html>
