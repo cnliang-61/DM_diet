@@ -8,16 +8,18 @@
     body { font-family: Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; }
     .container { max-width:900px; margin:auto; }
     .card { background:white; border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.08); }
-    h1 { color: #1e293b; text-align: center; margin-bottom: 10px; }
+    h1 { color: #1e293b; text-align: center; margin-bottom: 5px; }
+    /* 隱私說明文字樣式 */
+    .privacy-notice { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 20px; }
+    
     label { font-weight: bold; color: #475569; }
     input, select, textarea, button { width:100%; padding:12px; margin-top:10px; border-radius:10px; border:1px solid #cbd5e1; box-sizing:border-box; font-size: 16px; }
     
-    /* 按鈕顏色區分 */
     button { background:#2563eb; color:white; border:none; cursor:pointer; font-weight: bold; transition: 0.2s; }
     button:hover { background:#1d4ed8; }
     .delete { background:#ef4444; margin-top: 15px; }
     .delete:hover { background:#dc2626; }
-    .clear-all { background:#64748b; margin-bottom: 20px; } /* 清除全部按鈕使用灰色 */
+    .clear-all { background:#64748b; margin-bottom: 20px; }
     .clear-all:hover { background:#475569; }
 
     img { width:100%; max-height:400px; object-fit:contain; background:#f1f5f9; border-radius:12px; margin-top:10px; border: 1px solid #e2e8f0; }
@@ -29,12 +31,15 @@
 <body>
 <div class="container">
   <h1>智慧飲食紀錄系統</h1>
+  <div class="privacy-notice">
+    本網頁所輸入的任何資料僅會存留於該裝置中，不會上傳至雲端，故沒有個人資料外洩之慮
+  </div>
 
   <button class="clear-all" onclick="clearAllData()">🧹 清除所有歷史紀錄 (慎用)</button>
   
   <div class="card highlight-box">
     <h2 style="margin-top:0;">新增紀錄</h2>
-    <label for="photoInput">📷 上傳食物照片</label>
+    <label for="photoInput">📷 上傳食物照片 (支援 jfif/jpg/png/webp)</label>
     <input type="file" id="photoInput" accept=".jpg, .jpeg, .png, .webp, .jfif, image/*">
     
     <div id="previewContainer" style="display:none;">
@@ -145,59 +150,4 @@ function loadEntries(date) {
     const results = request.result;
     const div = document.getElementById('entries');
     if (results.length === 0) {
-      div.innerHTML = `<div class="no-data">📭 ${date} 目前沒有紀錄</div>`;
-      return;
-    }
-    results.sort((a, b) => b.id - a.id);
-    div.innerHTML = `<h3>📅 ${date} 的歷史清單</h3>` + results.map(e => `
-      <div class="card">
-        <strong>${e.type}</strong>
-        <div class="time">🕒 拍攝於 ${e.time}</div>
-        <img src="${e.photo}">
-        <p style="white-space: pre-wrap; background:#f8fafc; padding:10px; border-radius:8px;">${e.note || '無備註'}</p>
-        <button class="delete" onclick="deleteEntry(${e.id})">🗑️ 刪除</button>
-      </div>
-    `).join('');
-  };
-}
-
-function deleteEntry(id) {
-  if (!confirm("確定要刪除這筆紀錄嗎？")) return;
-  const transaction = db.transaction([STORE_NAME], "readwrite");
-  transaction.objectStore(STORE_NAME).delete(id);
-  transaction.oncomplete = () => loadEntries(document.getElementById('datePicker').value);
-}
-
-// --- 新增：清除所有資料的函式 ---
-function clearAllData() {
-  const confirm1 = confirm("⚠️ 注意：這將會永久刪除本網頁中「所有日期」的飲食紀錄與照片。確定要繼續嗎？");
-  if (confirm1) {
-    const confirm2 = confirm("最後確認：資料刪除後無法找回，您確定要清空整個資料庫嗎？");
-    if (confirm2) {
-      const transaction = db.transaction([STORE_NAME], "readwrite");
-      const store = transaction.objectStore(STORE_NAME);
-      const clearRequest = store.clear();
-      
-      clearRequest.onsuccess = () => {
-        alert("資料庫已完全清空。");
-        location.reload(); // 重新整理網頁
-      };
-      
-      clearRequest.onerror = () => {
-        alert("清除失敗，請稍後再試。");
-      };
-    }
-  }
-}
-
-function resetForm() {
-  document.getElementById('note').value = '';
-  document.getElementById('photoInput').value = '';
-  document.getElementById('previewContainer').style.display = 'none';
-  document.getElementById('customType').value = '';
-  document.getElementById('mealType').value = '早餐';
-  currentPhoto = '';
-}
-</script>
-</body>
-</html>
+      div.innerHTML = `<div class="
