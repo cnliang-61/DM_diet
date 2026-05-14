@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>飲食照片紀錄</title>
+  <title>飲食紀錄 (無限儲存版)</title>
   <style>
+    /* 保持原有的 CSS 樣式不變 */
     body { font-family: Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; }
     .container { max-width:900px; margin:auto; }
     .card { background:white; border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.08); }
@@ -12,45 +13,68 @@
     button { background:#2563eb; color:white; border:none; cursor:pointer; }
     button:hover { background:#1d4ed8; }
     img { width:100%; max-height:300px; object-fit:contain; background:#f1f5f9; border-radius:12px; margin-top:10px; }
-    .delete { background:#dc2626; }
+    .delete { background:#dc2626; margin-top: 15px; }
     .time { font-size:14px; color:#666; margin-top:8px; }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>彈性飲食照片紀錄</h1>
+  <h1>飲食紀錄 (IndexedDB 版)</h1>
+  <label for="datePicker">選擇日期：</label>
   <input type="date" id="datePicker">
 
   <div class="card">
     <h2>新增飲食紀錄</h2>
     <select id="mealType">
-      <option>早餐</option>
-      <option>午餐</option>
-      <option>點心</option>
-      <option>宵夜</option>
-      <option>其他</option>
+      <option>早餐</option><option>午餐</option><option>晚餐</option>
+      <option>點心</option><option>宵夜</option><option>其他</option>
     </select>
     <input type="text" id="customType" placeholder="請輸入餐別" style="display:none;">
     <input type="file" id="photoInput" accept="image/*">
     <div id="previewTime" class="time"></div>
     <img id="preview" style="display:none;">
-    <textarea id="note" rows="3" placeholder="備註（時間、份量、血糖等）"></textarea>
+    <textarea id="note" rows="3" placeholder="備註"></textarea>
     <button onclick="addEntry()">➕ 新增</button>
   </div>
 
   <div id="entries"></div>
-  <button onclick="saveAll()">💾 儲存全部</button>
 </div>
 
 <script>
-let entries = [];
-let currentPhoto = '';
-let currentPhotoTime = '';
+let db;
+const DB_NAME = "DietRecordDB";
+const STORE_NAME = "meals";
+
+// 1. 初始化資料庫
+const request = indexedDB.open(DB_NAME, 1);
+request.onupgradeneeded = (e) => {
+  db = e.target.result;
+  if (!db.objectStoreNames.contains(STORE_NAME)) {
+    // 建立一個以 date 為索引的儲存空間
+    const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
+    store.createIndex("date", "date", { unique: false });
+  }
+};
+request.onsuccess = (e) => {
+  db = e.target.result;
+  initPage();
+};
+
+function initPage() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('datePicker').value = today;
+  loadEntries(today);
+}
+
+document.getElementById('datePicker').addEventListener('change', (e) => loadEntries(e.target.value));
 
 document.getElementById('mealType').addEventListener('change', function() {
   document.getElementById('customType').style.display = this.value === '其他' ? 'block' : 'none';
 });
 
+// 照片處理 logic
+let currentPhoto = '';
+let currentPhotoTime = '';
 document.getElementById('photoInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -61,50 +85,76 @@ document.getElementById('photoInput').addEventListener('change', function(e) {
     document.getElementById('preview').src = currentPhoto;
     document.getElementById('preview').style.display = 'block';
     document.getElementById('previewTime').innerText = '📅 拍攝時間：' + currentPhotoTime;
-    e.target.value = '';
   };
   reader.readAsDataURL(file);
 });
 
+// 2. 新增資料到 IndexedDB
 function addEntry() {
+  const date = document.getElementById('datePicker').value;
   const mealType = document.getElementById('mealType').value;
   const customType = document.getElementById('customType').value;
   const note = document.getElementById('note').value;
   const type = mealType === '其他' ? customType : mealType;
-  if (!type || !currentPhoto) return;
 
-  entries.push({ id: Date.now(), type, note, photo: currentPhoto, time: currentPhotoTime });
-  renderEntries();
+  if (!type || !currentPhoto) return alert("請填寫完整資訊並上傳照片");
 
-  document.getElementById('note').value = '';
-  document.getElementById('customType').value = '';
-  document.getElementById('preview').style.display = 'none';
-  document.getElementById('previewTime').innerText = '';
-  currentPhoto = '';
+  const newEntry = {
+    id: Date.now(),
+    date: date,
+    type: type,
+    note: note,
+    photo: currentPhoto,
+    time: currentPhotoTime
+  };
+
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  transaction.objectStore(STORE_NAME).add(newEntry);
+  transaction.oncomplete = () => {
+    renderClear();
+    loadEntries(date);
+  };
+}
+
+// 3. 從 IndexedDB 讀取特定日期的資料
+function loadEntries(date) {
+  const transaction = db.transaction([STORE_NAME], "readonly");
+  const store = transaction.objectStore(STORE_NAME);
+  const index = store.index("date");
+  const request = index.getAll(IDBKeyRange.only(date));
+
+  request.onsuccess = () => {
+    const results = request.result;
+    const div = document.getElementById('entries');
+    if (results.length === 0) {
+      div.innerHTML = '<p style="text-align:center; color:#94a3b8;">此日期尚無紀錄</p>';
+      return;
+    }
+    div.innerHTML = results.map(e => `
+      <div class="card">
+        <h3>${e.type}</h3>
+        <div class="time">📅 ${e.time}</div>
+        <img src="${e.photo}">
+        <p style="white-space: pre-wrap;">${e.note}</p>
+        <button class="delete" onclick="deleteEntry(${e.id})">刪除</button>
+      </div>
+    `).join('');
+  };
 }
 
 function deleteEntry(id) {
-  entries = entries.filter(e => e.id !== id);
-  renderEntries();
+  if (!confirm("確定刪除？")) return;
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  transaction.objectStore(STORE_NAME).delete(id);
+  transaction.oncomplete = () => loadEntries(document.getElementById('datePicker').value);
 }
 
-function renderEntries() {
-  const div = document.getElementById('entries');
-  div.innerHTML = entries.map(e => `
-    <div class="card">
-      <h3>${e.type}</h3>
-      <div class="time">📅 ${e.time}</div>
-      <img src="${e.photo}">
-      <p>${e.note}</p>
-      <button class="delete" onclick="deleteEntry(${e.id})">刪除</button>
-    </div>
-  `).join('');
-}
-
-function saveAll() {
-  const date = document.getElementById('datePicker').value;
-  localStorage.setItem('meal-' + date, JSON.stringify(entries));
-  alert('已儲存');
+function renderClear() {
+  document.getElementById('note').value = '';
+  document.getElementById('photoInput').value = '';
+  document.getElementById('preview').style.display = 'none';
+  document.getElementById('previewTime').innerText = '';
+  currentPhoto = '';
 }
 </script>
 </body>
