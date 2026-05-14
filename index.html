@@ -9,19 +9,15 @@
     .container { max-width:900px; margin:auto; }
     .card { background:white; border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.08); }
     h1 { color: #1e293b; text-align: center; margin-bottom: 5px; }
-    /* 隱私說明文字樣式 */
     .privacy-notice { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 20px; }
-    
     label { font-weight: bold; color: #475569; }
     input, select, textarea, button { width:100%; padding:12px; margin-top:10px; border-radius:10px; border:1px solid #cbd5e1; box-sizing:border-box; font-size: 16px; }
-    
     button { background:#2563eb; color:white; border:none; cursor:pointer; font-weight: bold; transition: 0.2s; }
     button:hover { background:#1d4ed8; }
     .delete { background:#ef4444; margin-top: 15px; }
     .delete:hover { background:#dc2626; }
     .clear-all { background:#64748b; margin-bottom: 20px; }
     .clear-all:hover { background:#475569; }
-
     img { width:100%; max-height:400px; object-fit:contain; background:#f1f5f9; border-radius:12px; margin-top:10px; border: 1px solid #e2e8f0; }
     .time { font-size:14px; color:#2563eb; font-weight:bold; margin-top:8px; }
     .no-data { text-align:center; color:#94a3b8; padding: 40px 0; }
@@ -95,28 +91,41 @@ let currentPhoto = '';
 let currentPhotoDate = '';
 let currentPhotoFullTime = '';
 
+// 強化的照片讀取邏輯
 document.getElementById('photoInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
 
+  // 讀取檔案最後修改時間
   const fileDate = new Date(file.lastModified);
   currentPhotoDate = fileDate.toLocaleDateString('sv-SE');
   currentPhotoFullTime = fileDate.toLocaleString('zh-TW');
 
   const reader = new FileReader();
+  
   reader.onload = function(evt) {
     currentPhoto = evt.target.result;
     document.getElementById('preview').src = currentPhoto;
     document.getElementById('previewContainer').style.display = 'block';
     document.getElementById('previewTime').innerText = '🕒 辨識到照片時間：' + currentPhotoFullTime;
+    
+    // 自動將日期切換到照片的日期
     document.getElementById('datePicker').value = currentPhotoDate;
     loadEntries(currentPhotoDate);
   };
+
+  reader.onerror = function() {
+    alert("照片讀取失敗，請嘗試更換照片或使用其他格式。");
+  };
+
   reader.readAsDataURL(file);
 });
 
 function addEntry() {
-  if (!currentPhoto) return alert("請先上傳照片");
+  if (!currentPhoto) {
+    alert("請先成功上傳照片再儲存。");
+    return;
+  }
   
   const mealType = document.getElementById('mealType').value;
   const customType = document.getElementById('customType').value;
@@ -133,8 +142,11 @@ function addEntry() {
   };
 
   const transaction = db.transaction([STORE_NAME], "readwrite");
-  transaction.objectStore(STORE_NAME).add(newEntry);
-  transaction.oncomplete = () => {
+  const store = transaction.objectStore(STORE_NAME);
+  const addRequest = store.add(newEntry);
+
+  addRequest.onsuccess = () => {
+    alert(`紀錄已存檔於 ${currentPhotoDate}`);
     resetForm();
     loadEntries(currentPhotoDate);
   };
@@ -150,4 +162,52 @@ function loadEntries(date) {
     const results = request.result;
     const div = document.getElementById('entries');
     if (results.length === 0) {
-      div.innerHTML = `<div class="
+      div.innerHTML = `<div class="no-data">📭 ${date} 目前沒有紀錄</div>`;
+      return;
+    }
+    results.sort((a, b) => b.id - a.id);
+    div.innerHTML = `<h3>📅 ${date} 的歷史清單</h3>` + results.map(e => `
+      <div class="card">
+        <strong>${e.type}</strong>
+        <div class="time">🕒 拍攝於 ${e.time}</div>
+        <img src="${e.photo}">
+        <p style="white-space: pre-wrap; background:#f8fafc; padding:10px; border-radius:8px;">${e.note || '無備註'}</p>
+        <button class="delete" onclick="deleteEntry(${e.id})">🗑️ 刪除</button>
+      </div>
+    `).join('');
+  };
+}
+
+function deleteEntry(id) {
+  if (!confirm("確定要刪除這筆紀錄嗎？")) return;
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  transaction.objectStore(STORE_NAME).delete(id);
+  transaction.oncomplete = () => loadEntries(document.getElementById('datePicker').value);
+}
+
+function clearAllData() {
+  if (confirm("⚠️ 注意：這將會永久刪除本網頁中「所有日期」的飲食紀錄與照片。確定要繼續嗎？")) {
+    if (confirm("最後確認：資料刪除後無法找回，您確定要清空整個資料庫嗎？")) {
+      const transaction = db.transaction([STORE_NAME], "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const clearRequest = store.clear();
+      
+      clearRequest.onsuccess = () => {
+        alert("資料庫已完全清空。");
+        location.reload();
+      };
+    }
+  }
+}
+
+function resetForm() {
+  document.getElementById('note').value = '';
+  document.getElementById('photoInput').value = '';
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('customType').value = '';
+  document.getElementById('mealType').value = '早餐';
+  currentPhoto = '';
+}
+</script>
+</body>
+</html>
