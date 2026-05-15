@@ -10,18 +10,35 @@
     .card { background:white; border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.08); }
     h1 { color: #1e293b; text-align: center; margin-bottom: 5px; }
     .privacy-notice { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 20px; }
-    label { font-weight: bold; color: #475569; }
+    
+    /* 頁籤導覽列樣式 */
+    .tabs-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .tab-btn { flex: 1; padding: 12px; background: #e2e8f0; color: #475569; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; text-align: center; }
+    .tab-btn.active { background: #2563eb; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    label { font-weight: bold; color: #475569; display: block; margin-top: 15px; }
     input, select, textarea, button { width:100%; padding:12px; margin-top:10px; border-radius:10px; border:1px solid #cbd5e1; box-sizing:border-box; font-size: 16px; }
+    
     button { background:#2563eb; color:white; border:none; cursor:pointer; font-weight: bold; transition: 0.2s; }
     button:hover { background:#1d4ed8; }
     .delete { background:#ef4444; margin-top: 15px; }
     .delete:hover { background:#dc2626; }
-    .clear-all { background:#64748b; margin-bottom: 20px; }
+    .clear-all { background:#64748b; margin-top: 30px; }
     .clear-all:hover { background:#475569; }
+
     img { width:100%; max-height:400px; object-fit:contain; background:#f1f5f9; border-radius:12px; margin-top:10px; border: 1px solid #e2e8f0; }
     .time { font-size:14px; color:#2563eb; font-weight:bold; margin-top:8px; }
     .no-data { text-align:center; color:#94a3b8; padding: 40px 0; }
-    .highlight-box { border-left: 5px solid #2563eb; background: #eff6ff; }
+    .highlight-box { border-left: 5px solid #2563eb; }
+
+    /* 新增：歷史日期按鈕與摺疊區塊樣式 */
+    .date-group-btn { background: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; text-align: left; margin-top: 10px; padding: 16px; border-radius: 12px; font-size: 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+    .date-group-btn:hover { background: #f1f5f9; }
+    .date-group-btn .badge { background: #2563eb; color: white; padding: 4px 10px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+    .date-details { display: none; margin-top: 10px; padding-left: 10px; border-left: 3px dashed #cbd5e1; }
+    .date-details.open { display: block; }
   </style>
 </head>
 <body>
@@ -31,34 +48,43 @@
     本網頁所輸入的任何資料僅會存留於該裝置中，不會上傳至雲端，故沒有個人資料外洩之慮
   </div>
 
-  <button class="clear-all" onclick="clearAllData()">🧹 清除所有歷史紀錄 (慎用)</button>
-  
-  <div class="card highlight-box">
-    <h2 style="margin-top:0;">新增紀錄</h2>
-    <label for="photoInput">📷 上傳食物照片</label>
-    <input type="file" id="photoInput" accept=".jpg, .jpeg, .png, .webp, .jfif, image/*">
-    
-    <div id="previewContainer" style="display:none;">
-      <div id="previewTime" class="time"></div>
-      <img id="preview">
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('inputTab')">➕ 新增紀錄</button>
+    <button class="tab-btn" onclick="switchTab('viewTab')">📅 歷史清單</button>
+  </div>
+
+  <div id="inputTab" class="tab-content active">
+    <div class="card highlight-box">
+      <h2 style="margin-top:0;">新增飲食紀錄</h2>
+      <label for="photoInput">📷 上傳食物照片</label>
+      <input type="file" id="photoInput" accept=".jpg, .jpeg, .png, .webp, .jfif, image/*">
+      
+      <div id="previewContainer" style="display:none;">
+        <div id="previewTime" class="time"></div>
+        <img id="preview">
+      </div>
+
+      <label for="mealType">🍴 選擇餐別</label>
+      <select id="mealType">
+        <option>早餐</option><option>午餐</option><option>晚餐</option>
+        <option>點心</option><option>宵夜</option><option>其他</option>
+      </select>
+      <input type="text" id="customType" placeholder="請手動輸入餐別" style="display:none;">
+      
+      <label for="note">📝 飲食備註</label>
+      <textarea id="note" rows="3" placeholder="備註（份量、血糖等...）"></textarea>
+      <button onclick="addEntry()">➕ 儲存紀錄</button>
     </div>
+  </div>
 
-    <select id="mealType">
-      <option>早餐</option><option>午餐</option><option>晚餐</option>
-      <option>點心</option><option>宵夜</option><option>其他</option>
-    </select>
-    <input type="text" id="customType" placeholder="請手動輸入餐別" style="display:none;">
+  <div id="viewTab" class="tab-content">
+    <h3 style="color:#1e293b; margin-bottom: 10px;">🗂️ 歷史日期清單</h3>
     
-    <textarea id="note" rows="3" placeholder="備註（份量、血糖等...）"></textarea>
-    <button onclick="addEntry()">➕ 儲存紀錄</button>
+    <div id="dateListContainer"></div>
+    
+    <button class="clear-all" onclick="clearAllData()">🧹 清除所有歷史紀錄 (慎用)</button>
   </div>
 
-  <div class="card">
-    <label for="datePicker">📅 檢視日期清單</label>
-    <input type="date" id="datePicker">
-  </div>
-  
-  <div id="entries"></div>
 </div>
 
 <script>
@@ -77,55 +103,53 @@ request.onupgradeneeded = (e) => {
 };
 request.onsuccess = (e) => {
   db = e.target.result;
-  const today = new Date().toLocaleDateString('sv-SE');
-  document.getElementById('datePicker').value = today;
-  loadEntries(today);
+  // 初始化時加載日期清單
+  loadDateList();
 };
 
-document.getElementById('datePicker').addEventListener('change', (e) => loadEntries(e.target.value));
+// 頁籤切換
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  if(tabId === 'inputTab') {
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    // 切換到歷史清單時，重新載入有資料的日期清單
+    loadDateList();
+  }
+}
+
 document.getElementById('mealType').addEventListener('change', function() {
-  document.getElementById('customType').style.display = this.value === '其他' ? 'block' : 'none';
+  document.getElementById('customType').style.display = this.value === '開他' || this.value === '其他' ? 'block' : 'none';
 });
 
 let currentPhoto = '';
 let currentPhotoDate = '';
 let currentPhotoFullTime = '';
 
-// 強化的照片讀取邏輯
 document.getElementById('photoInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  // 讀取檔案最後修改時間
   const fileDate = new Date(file.lastModified);
   currentPhotoDate = fileDate.toLocaleDateString('sv-SE');
   currentPhotoFullTime = fileDate.toLocaleString('zh-TW');
 
   const reader = new FileReader();
-  
   reader.onload = function(evt) {
     currentPhoto = evt.target.result;
     document.getElementById('preview').src = currentPhoto;
     document.getElementById('previewContainer').style.display = 'block';
     document.getElementById('previewTime').innerText = '🕒 辨識到照片時間：' + currentPhotoFullTime;
-    
-    // 自動將日期切換到照片的日期
-    document.getElementById('datePicker').value = currentPhotoDate;
-    loadEntries(currentPhotoDate);
   };
-
-  reader.onerror = function() {
-    alert("照片讀取失敗，請嘗試更換照片或使用其他格式。");
-  };
-
   reader.readAsDataURL(file);
 });
 
 function addEntry() {
-  if (!currentPhoto) {
-    alert("請先成功上傳照片再儲存。");
-    return;
-  }
+  if (!currentPhoto) return alert("請先上傳照片");
   
   const mealType = document.getElementById('mealType').value;
   const customType = document.getElementById('customType').value;
@@ -142,17 +166,67 @@ function addEntry() {
   };
 
   const transaction = db.transaction([STORE_NAME], "readwrite");
-  const store = transaction.objectStore(STORE_NAME);
-  const addRequest = store.add(newEntry);
-
-  addRequest.onsuccess = () => {
-    alert(`紀錄已存檔於 ${currentPhotoDate}`);
+  transaction.objectStore(STORE_NAME).add(newEntry);
+  transaction.oncomplete = () => {
+    alert(`紀錄已成功存檔！將為您跳轉至歷史清單查看。`);
     resetForm();
-    loadEntries(currentPhotoDate);
+    switchTab('viewTab');
   };
 }
 
-function loadEntries(date) {
+// 新增：抓取所有有資料的日期並顯示列表
+function loadDateList() {
+  if (!db) return;
+  const transaction = db.transaction([STORE_NAME], "readonly");
+  const store = transaction.objectStore(STORE_NAME);
+  const request = store.getAll();
+
+  request.onsuccess = () => {
+    const allEntries = request.result;
+    const container = document.getElementById('dateListContainer');
+    
+    if (allEntries.length === 0) {
+      container.innerHTML = `<div class="no-data">📭 目前沒有任何歷史紀錄</div>`;
+      return;
+    }
+
+    // 依據日期分組並計算每筆日期的數量
+    const dateMap = {};
+    allEntries.forEach(entry => {
+      if (!dateMap[entry.date]) {
+        dateMap[entry.date] = 0;
+      }
+      dateMap[entry.date]++;
+    });
+
+    // 將日期排序（由新到舊）
+    const sortedDates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
+
+    // 渲染日期按鈕外殼
+    container.innerHTML = sortedDates.map(date => `
+      <div>
+        <button class="date-group-btn" onclick="toggleDateDetails('${date}')">
+          <span>📅 ${date}</span>
+          <span class="badge">${dateMap[date]} 筆紀錄 ▾</span>
+        </button>
+        <div id="details-${date}" class="date-details">
+          </div>
+      </div>
+    `).join('');
+  };
+}
+
+// 新增：點擊日期按鈕時切換折疊狀態，並在展開時讀取當天資料
+function toggleDateDetails(date) {
+  const detailsDiv = document.getElementById(`details-${date}`);
+  
+  // 如果已經是打開狀態，就把它關起來
+  if (detailsDiv.classList.contains('open')) {
+    detailsDiv.classList.remove('open');
+    return;
+  }
+
+  // 讀取當天詳細資料並填入
   const transaction = db.transaction([STORE_NAME], "readonly");
   const store = transaction.objectStore(STORE_NAME);
   const index = store.index("date");
@@ -160,29 +234,37 @@ function loadEntries(date) {
 
   request.onsuccess = () => {
     const results = request.result;
-    const div = document.getElementById('entries');
-    if (results.length === 0) {
-      div.innerHTML = `<div class="no-data">📭 ${date} 目前沒有紀錄</div>`;
-      return;
-    }
-    results.sort((a, b) => b.id - a.id);
-    div.innerHTML = `<h3>📅 ${date} 的歷史清單</h3>` + results.map(e => `
-      <div class="card">
-        <strong>${e.type}</strong>
+    results.sort((a, b) => b.id - a.id); // 由新到舊排序
+
+    detailsDiv.innerHTML = results.map(e => `
+      <div class="card" style="margin-top: 10px; margin-bottom: 10px; border: 1px solid #e2e8f0;">
+        <strong style="font-size: 1.1em; color: #1e293b;">${e.type}</strong>
         <div class="time">🕒 拍攝於 ${e.time}</div>
         <img src="${e.photo}">
-        <p style="white-space: pre-wrap; background:#f8fafc; padding:10px; border-radius:8px;">${e.note || '無備註'}</p>
-        <button class="delete" onclick="deleteEntry(${e.id})">🗑️ 刪除</button>
+        <p style="white-space: pre-wrap; background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:0;">${e.note || '無備註'}</p>
+        <button class="delete" onclick="deleteEntryInList(${e.id}, '${date}')">🗑️ 刪除此筆</button>
       </div>
     `).join('');
+
+    // 顯示區塊
+    detailsDiv.classList.add('open');
   };
 }
 
-function deleteEntry(id) {
+// 新增：在清單中直接刪除特定紀錄並更新畫面
+function deleteEntryInList(id, date) {
   if (!confirm("確定要刪除這筆紀錄嗎？")) return;
   const transaction = db.transaction([STORE_NAME], "readwrite");
   transaction.objectStore(STORE_NAME).delete(id);
-  transaction.oncomplete = () => loadEntries(document.getElementById('datePicker').value);
+  transaction.oncomplete = () => {
+    // 重新整理日期清單與內部明細
+    loadDateList();
+    // 稍微延遲一下等外層清單重繪後，自動重新展開該日期（如果該日期還有其他資料的話）
+    setTimeout(() => {
+      const detailsDiv = document.getElementById(`details-${date}`);
+      if (detailsDiv) toggleDateDetails(date);
+    }, 50);
+  };
 }
 
 function clearAllData() {
