@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智慧飲食紀錄系統</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; }
+    .container { max-width:900px; margin:auto; }
+    .card { background:white; border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.08); }
+    h1 { color: #1e293b; text-align: center; margin-bottom: 5px; }
+    .privacy-notice { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 20px; }
+    
+    /* 頁籤導覽列樣式 */
+    .tabs-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .tab-btn { flex: 1; padding: 12px; background: #e2e8f0; color: #475569; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; text-align: center; }
+    .tab-btn.active { background: #2563eb; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    label { font-weight: bold; color: #475569; display: block; margin-top: 15px; }
+    input, select, textarea, button { width:100%; padding:12px; margin-top:10px; border-radius:10px; border:1px solid #cbd5e1; box-sizing:border-box; font-size: 16px; }
+    
+    button { background:#2563eb; color:white; border:none; cursor:pointer; font-weight: bold; transition: 0.2s; }
+    button:hover { background:#1d4ed8; }
+    .delete { background:#ef4444; margin-top: 15px; }
+    .delete:hover { background:#dc2626; }
+    .clear-all { background:#64748b; margin-top: 20px; }
+    .clear-all:hover { background:#475569; }
+
+    img { width:100%; max-height:400px; object-fit:contain; background:#f1f5f9; border-radius:12px; margin-top:10px; border: 1px solid #e2e8f0; }
+    .time { font-size:14px; color:#2563eb; font-weight:bold; margin-top:8px; }
+    .no-data { text-align:center; color:#94a3b8; padding: 40px 0; }
+    .highlight-box { border-left: 5px solid #2563eb; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>智慧飲食紀錄系統</h1>
+  <div class="privacy-notice">
+    本網頁所輸入的任何資料僅會存留於該裝置中，不會上傳至雲端，故沒有個人資料外洩之慮
+  </div>
+
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('inputTab')">➕ 新增紀錄</button>
+    <button class="tab-btn" onclick="switchTab('viewTab')">📅 歷史清單</button>
+  </div>
+
+  <div id="inputTab" class="tab-content active">
+    <div class="card highlight-box">
+      <h2 style="margin-top:0;">新增飲食紀錄</h2>
+      <label for="photoInput">📷 上傳食物照片 (支援 jfif/jpg/png/webp)</label>
+      <input type="file" id="photoInput" accept=".jpg, .jpeg, .png, .webp, .jfif, image/*">
+      
+      <div id="previewContainer" style="display:none;">
+        <div id="previewTime" class="time"></div>
+        <img id="preview">
+      </div>
+
+      <label for="mealType">🍴 選擇餐別</label>
+      <select id="mealType">
+        <option>早餐</option><option>午餐</option><option>晚餐</option>
+        <option>點心</option><option>宵夜</option><option>其他</option>
+      </select>
+      <input type="text" id="customType" placeholder="請手動輸入餐別" style="display:none;">
+      
+      <label for="note">📝 飲食備註</label>
+      <textarea id="note" rows="3" placeholder="備註（份量、血糖等...）"></textarea>
+      <button onclick="addEntry()">➕ 儲存紀錄</button>
+    </div>
+  </div>
+
+  <div id="viewTab" class="tab-content">
+    <div class="card">
+      <label for="datePicker" style="margin-top:0;">📅 選擇要檢視的日期</label>
+      <input type="date" id="datePicker">
+    </div>
+    
+    <div id="entries"></div>
+    
+    <button class="clear-all" onclick="clearAllData()">🧹 清除所有歷史紀錄 (慎用)</button>
+  </div>
+
+</div>
+
+<script>
+let db;
+const DB_NAME = "DietRecordDB";
+const STORE_NAME = "meals";
+
+// 初始化資料庫
+const request = indexedDB.open(DB_NAME, 1);
+request.onupgradeneeded = (e) => {
+  db = e.target.result;
+  if (!db.objectStoreNames.contains(STORE_NAME)) {
+    const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
+    store.createIndex("date", "date", { unique: false });
+  }
+};
+request.onsuccess = (e) => {
+  db = e.target.result;
+  const today = new Date().toLocaleDateString('sv-SE');
+  document.getElementById('datePicker').value = today;
+  loadEntries(today);
+};
+
+// 頁籤切換函式
+function switchTab(tabId) {
+  // 切換內容顯示
+  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+
+  // 切換按鈕高亮狀態
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  if(tabId === 'inputTab') {
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    // 切換到檢視頁面時，自動重新載入選定日期的資料
+    loadEntries(document.getElementById('datePicker').value);
+  }
+}
+
+document.getElementById('datePicker').addEventListener('change', (e) => loadEntries(e.target.value));
+document.getElementById('mealType').addEventListener('change', function() {
+  document.getElementById('customType').style.display = this.value === '其他' ? 'block' : 'none';
+});
+
+let currentPhoto = '';
+let currentPhotoDate = '';
+let currentPhotoFullTime = '';
+
+document.getElementById('photoInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const fileDate = new Date(file.lastModified);
+  currentPhotoDate = fileDate.toLocaleDateString('sv-SE');
+  currentPhotoFullTime = fileDate.toLocaleString('zh-TW');
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    currentPhoto = evt.target.result;
+    document.getElementById('preview').src = currentPhoto;
+    document.getElementById('previewContainer').style.display = 'block';
+    document.getElementById('previewTime').innerText = '🕒 辨識到照片時間：' + currentPhotoFullTime;
+    
+    // 照片載入後，同步更新檢視分頁的日期選取器
+    document.getElementById('datePicker').value = currentPhotoDate;
+  };
+  reader.readAsDataURL(file);
+});
+
+function addEntry() {
+  if (!currentPhoto) return alert("請先上傳照片");
+  
+  const mealType = document.getElementById('mealType').value;
+  const customType = document.getElementById('customType').value;
+  const note = document.getElementById('note').value;
+  const type = mealType === '其他' ? customType : mealType;
+
+  const newEntry = {
+    id: Date.now(),
+    date: currentPhotoDate,
+    type: type,
+    note: note,
+    photo: currentPhoto,
+    time: currentPhotoFullTime
+  };
+
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  transaction.objectStore(STORE_NAME).add(newEntry);
+  transaction.oncomplete = () => {
+    alert(`紀錄已成功存檔！將為您跳轉至歷史清單查看。`);
+    resetForm();
+    // 自動切換到檢視標籤並讀取
+    switchTab('viewTab');
+  };
+}
+
+function loadEntries(date) {
+  if (!db) return; // 確保資料庫初始化完成
+  const transaction = db.transaction([STORE_NAME], "readonly");
+  const store = transaction.objectStore(STORE_NAME);
+  const index = store.index("date");
+  const request = index.getAll(IDBKeyRange.only(date));
+
+  request.onsuccess = () => {
+    const results = request.result;
+    const div = document.getElementById('entries');
+    if (results.length === 0) {
+      div.innerHTML = `<div class="no-data">📭 ${date} 目前沒有紀錄</div>`;
+      return;
+    }
+    results.sort((a, b) => b.id - a.id);
+    div.innerHTML = `<h3 style="color:#1e293b; margin-top:20px;">📅 ${date} 的歷史清單</h3>` + results.map(e => `
+      <div class="card">
+        <strong style="font-size: 1.1em;">${e.type}</strong>
+        <div class="time">🕒 拍攝於 ${e.time}</div>
+        <img src="${e.photo}">
+        <p style="white-space: pre-wrap; background:#f8fafc; padding:10px; border-radius:8px;">${e.note || '無備註'}</p>
+        <button class="delete" onclick="deleteEntry(${e.id})">🗑️ 刪除</button>
+      </div>
+    `).join('');
+  };
+}
+
+function deleteEntry(id) {
+  if (!confirm("確定要刪除這筆紀錄嗎？")) return;
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  transaction.objectStore(STORE_NAME).delete(id);
+  transaction.oncomplete = () => loadEntries(document.getElementById('datePicker').value);
+}
+
+function clearAllData() {
+  if (confirm("⚠️ 注意：這將會永久刪除本網頁中「所有日期」的飲食紀錄與照片。確定要繼續嗎？")) {
+    if (confirm("最後確認：資料刪除後無法找回，您確定要清空整個資料庫嗎？")) {
+      const transaction = db.transaction([STORE_NAME], "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const clearRequest = store.clear();
+      
+      clearRequest.onsuccess = () => {
+        alert("資料庫已完全清空。");
+        location.reload();
+      };
+    }
+  }
+}
+
+function resetForm() {
+  document.getElementById('note').value = '';
+  document.getElementById('photoInput').value = '';
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('customType').value = '';
+  document.getElementById('mealType').value = '早餐';
+  currentPhoto = '';
+}
+</script>
+</body>
+</html>
