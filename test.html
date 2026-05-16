@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智慧飲食紀錄系統</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f8fafc; margin:0; padding:20px; }
+    .container { max-width:900px; margin:auto; }
+    .card { background:white; border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.08); }
+    h1 { color: #1e293b; text-align: center; margin-bottom: 5px; }
+    .privacy-notice { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 20px; }
+    
+    /* 頁籤導覽列樣式 */
+    .tabs-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .tab-btn { flex: 1; padding: 12px; background: #e2e8f0; color: #475569; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; text-align: center; }
+    .tab-btn.active { background: #2563eb; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    label { font-weight: bold; color: #475569; display: block; margin-top: 15px; }
+    input, select, textarea, button { width:100%; padding:12px; margin-top:10px; border-radius:10px; border:1px solid #cbd5e1; box-sizing:border-box; font-size: 16px; }
+    
+    button { background:#2563eb; color:white; border:none; cursor:pointer; font-weight: bold; transition: 0.2s; }
+    button:hover { background:#1d4ed8; }
+    
+    /* 地圖專用按鈕樣式 */
+    .map-btn { background: #0f766e; margin-top: 8px; padding: 8px; font-size: 14px; }
+    .map-btn:hover { background: #115e59; }
+    .location-link { display: inline-block; color: #0284c7; text-decoration: none; font-weight: bold; margin-top: 5px; }
+    .location-link:hover { text-decoration: underline; }
+
+    .delete { background:#ef4444; margin-top: 15px; }
+    .delete:hover { background:#dc2626; }
+    .clear-all { background:#64748b; margin-top: 30px; }
+    .clear-all:hover { background:#475569; }
+
+    img { width:100%; max-height:400px; object-fit:contain; background:#f1f5f9; border-radius:12px; margin-top:10px; border: 1px solid #e2e8f0; }
+    .time { font-size:14px; color:#2563eb; font-weight:bold; margin-top:8px; }
+    .no-data { text-align:center; color:#94a3b8; padding: 40px 0; }
+    .highlight-box { border-left: 5px solid #2563eb; }
+
+    /* 歷史日期按鈕與摺疊區塊樣式 */
+    .date-group-btn { background: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; text-align: left; margin-top: 10px; padding: 16px; border-radius: 12px; font-size: 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+    .date-group-btn:hover { background: #f1f5f9; }
+    .date-group-btn .badge { background: #2563eb; color: white; padding: 4px 10px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+    .date-details { display: none; margin-top: 10px; padding-left: 10px; border-left: 3px dashed #cbd5e1; }
+    .date-details.open { display: block; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>智慧飲食紀錄系統</h1>
+  <div class="privacy-notice">
+    本網頁所輸入的任何資料僅會存留於該裝置中，不會上傳至雲端，故沒有個人資料外洩之慮
+  </div>
+
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('inputTab')">➕ 新增紀錄</button>
+    <button class="tab-btn" onclick="switchTab('viewTab')">📅 歷史清單</button>
+  </div>
+
+  <div id="inputTab" class="tab-content active">
+    <div class="card highlight-box">
+      <h2 style="margin-top:0;">新增飲食紀錄</h2>
+      
+      <label for="photoInput">📷 上傳食物照片 (支援 jfif/jpg/png/webp)</label>
+      <input type="file" id="fileInput" accept=".jpg, .jpeg, .png, .webp, .jfif, image/*" style="display:none;">
+      <button type="button" onclick="document.getElementById('fileInput').click()" style="background:#475569; margin-top:10px;">📂 點選此處上傳照片</button>
+      
+      <div id="previewContainer" style="display:none;">
+        <div id="previewTime" class="time"></div>
+        <img id="preview">
+      </div>
+
+      <label for="mealType">🍴 選擇餐別</label>
+      <select id="mealType">
+        <option>早餐</option><option>午餐</option><option>晚餐</option>
+        <option>點心</option><option>宵夜</option><option>其他</option>
+      </select>
+      <input type="text" id="customType" placeholder="請手動輸入餐別" style="display:none;">
+      
+      <label for="locationInput">📍 用餐地點 (選填)</label>
+      <input type="text" id="locationInput" placeholder="輸入店名搜尋，或留白點下方按鈕定位目前位置">
+      <button type="button" class="map-btn" onclick="searchOnGoogleMap()">🔍 開啟 Google Map (輸入店名可搜尋 / 留白可定位當前位置)</button>
+      
+      <label for="note">📝 飲食備註</label>
+      <textarea id="note" rows="3" placeholder="備註（份量、血糖等...）"></textarea>
+      <button onclick="addEntry()">➕ 儲存紀錄</button>
+    </div>
+  </div>
+
+  <div id="viewTab" class="tab-content">
+    <h3 style="color:#1e293b; margin-bottom: 10px;">🗂️ 歷史日期清單</h3>
+    
+    <div id="dateListContainer"></div>
+    
+    <button class="clear-all" onclick="clearAllData()">🧹 清除所有歷史紀錄 (慎用)</button>
+  </div>
+
+</div>
+
+<script>
+let db;
+const DB_NAME = "DietRecordDB";
+const STORE_NAME = "meals";
+
+// 初始化資料庫
+const request = indexedDB.open(DB_NAME, 1);
+request.onupgradeneeded = (e) => {
+  db = e.target.result;
+  if (!db.objectStoreNames.contains(STORE_NAME)) {
+    const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
+    store.createIndex("date", "date", { unique: false });
+  }
+};
+request.onsuccess = (e) => {
+  db = e.target.result;
+  loadDateList();
+};
+
+// 頁籤切換
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  if(tabId === 'inputTab') {
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    loadDateList();
+  }
+}
+
+document.getElementById('mealType').addEventListener('change', function() {
+  document.getElementById('customType').style.display = this.value === '其他' ? 'block' : 'none';
+});
+
+let currentPhoto = '';
+let currentPhotoDate = '';
+let currentPhotoFullTime = '';
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const fileDate = new Date(file.lastModified);
+  currentPhotoDate = fileDate.toLocaleDateString('sv-SE');
+  currentPhotoFullTime = fileDate.toLocaleString('zh-TW');
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    currentPhoto = evt.target.result;
+    document.getElementById('preview').src = currentPhoto;
+    document.getElementById('previewContainer').style.display = 'block';
+    document.getElementById('previewTime').innerText = '📅 拍攝時間：' + currentPhotoFullTime;
+  };
+  reader.readAsDataURL(file);
+});
+
+// 智慧 Google Map 按鈕邏輯
+function searchOnGoogleMap() {
+  const query = document.getElementById('locationInput').value.trim();
+  
+  if (query) {
+    // 1. 如果有輸入文字：直接去 Google Map 搜尋關鍵字
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    window.open(mapUrl, '_blank');
+  } else {
+    // 2. 如果沒有輸入文字：嘗試獲取裝置目前定位經緯度
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          // 直接開啟 Google Map 定位到經緯度並放大 (z=15)
+          const mapUrl = `https://www.google.com/maps/@${lat},${lng},15z`;
+          window.open(mapUrl, '_blank');
+        },
+        function(error) {
+          // 如果使用者拒絕定位或失敗，則開啟預設的 Google Map 頁面
+          console.warn("無法取得定位資訊:", error.message);
+          alert("由於瀏覽器定位權限未開啟或環境限制，改為您開啟預設 Google 地圖。");
+          window.open('https://www.google.com/maps', '_blank');
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      // 瀏覽器不支援定位 API
+      window.open('https://www.google.com/maps', '_blank');
+    }
+  }
+}
+
+function addEntry() {
+  if (!currentPhoto) return alert("請先上傳照片");
+  
+  const mealType = document.getElementById('mealType').value;
+  const customType = document.getElementById('customType').value;
+  const note = document.getElementById('note').value;
+  const location = document.getElementById('locationInput').value.trim();
+  const type = mealType === '其他' ? customType : mealType;
+
+  const newEntry = {
+    id: Date.now(),
+    date: currentPhotoDate,
+    type: type,
+    note: note,
+    location: location,
+    photo: currentPhoto,
+    time: currentPhotoFullTime
+  };
+
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  transaction.objectStore(STORE_NAME).add(newEntry);
+  transaction.oncomplete = () => {
+    alert(`紀錄已成功存檔！將為您跳轉至歷史清單查看。`);
+    resetForm();
+    switchTab('viewTab');
+  };
+}
+
+function loadDateList() {
+  if (!db) return;
+  const transaction = db.transaction([STORE_NAME], "readonly");
+  const store = transaction.objectStore(STORE_NAME);
+  const request = store.getAll();
+
+  request.onsuccess = () => {
+    const allEntries = request.result;
+    const container = document.getElementById('dateListContainer');
+    
+    if (allEntries.length === 0) {
+      container.innerHTML = `<div class="no-data">📭 目前沒有任何歷史紀錄</div>`;
+      return;
+    }
+
+    const dateMap = {};
+    allEntries.forEach(entry => {
+      if (!dateMap[entry.date]) dateMap[entry.date] = 0;
+      dateMap[entry.date]++;
+    });
+
+    const sortedDates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
+
+    container.innerHTML = sortedDates.map(date => `
+      <div>
+        <button class="date-group-btn" onclick="toggleDateDetails('${date}')">
+          <span>📅 ${date}</span>
+          <span class="badge">${dateMap[date]} 筆紀錄 ▾</span>
+        </button>
+        <div id="details-${date}" class="date-details"></div>
+      </div>
+    `).join('');
+  };
+}
+
+function toggleDateDetails(date) {
+  const detailsDiv = document.getElementById(`details-${date}`);
+  
+  if (detailsDiv.classList.contains('open')) {
+    detailsDiv.classList.remove('open');
+    return;
+  }
+
+  const transaction = db.transaction([STORE_NAME], "readonly");
+  const store = transaction.objectStore(STORE_NAME);
+  const index = store.index("date");
+  const request = index.getAll(IDBKeyRange.only(date));
+
+  request.onsuccess = () => {
+    const results = request.result;
+    results.sort((a, b) => b.id - a.id);
+
+    detailsDiv.innerHTML = results.map(e => {
+      const locationHtml = e.location 
+        ? `<div style="margin-top:5px;">📍 地點：<a class="location-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.location)}" target="_blank"> ${e.location} 🌐</a></div>` 
+        : '';
+
+      return `
+        <div class="card" style="margin-top: 10px; margin-bottom: 10px; border: 1px solid #e2e8f0;">
+          <strong style="font-size: 1.1em; color: #1e293b;">${e.type}</strong>
+          <div class="time">🕒 拍攝於 ${e.time}</div>
+          ${locationHtml}
+          <img src="${e.photo}">
+          <p style="white-space: pre-wrap; background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:0;">${e.note || '無備註'}</p>
+          <button class="delete" onclick="deleteEntryInList(${e.id}, '${date}')">🗑️ 刪除此筆</button>
+        </div>
+      `;
+    }).join('');
+
+    detailsDiv.classList.add('open');
+  };
+}
+
+function deleteEntryInList(id, date) {
+  if (!confirm("確定要刪除這筆紀錄嗎？")) return;
+  const transaction = db.transaction([STORE_NAME], "readwrite");
+  transaction.objectStore(STORE_NAME).delete(id);
+  transaction.oncomplete = () => {
+    loadDateList();
+    setTimeout(() => {
+      const detailsDiv = document.getElementById(`details-${date}`);
+      if (detailsDiv) toggleDateDetails(date);
+    }, 50);
+  };
+}
+
+function clearAllData() {
+  if (confirm("⚠️ 注意：這將會永久刪除本網頁中「所有日期」的飲食紀錄與照片。確定要繼續嗎？")) {
+    if (confirm("最後確認：資料刪除後無法找回，您確定要清空整個資料庫嗎？")) {
+      const transaction = db.transaction([STORE_NAME], "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const clearRequest = store.clear();
+      
+      clearRequest.onsuccess = () => {
+        alert("資料庫已完全清空。");
+        location.reload();
+      };
+    }
+  }
+}
+
+function resetForm() {
+  document.getElementById('note').value = '';
+  document.getElementById('locationInput').value = '';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('customType').value = '';
+  document.getElementById('mealType').value = '早餐';
+  currentPhoto = '';
+}
+</script>
+</body>
+</html>
