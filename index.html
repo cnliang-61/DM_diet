@@ -65,7 +65,8 @@
       <h2 style="margin-top:0;">新增飲食紀錄</h2>
       
       <label for="photoInput">📷 上傳食物照片</label>
-      <input type="file" id="photoInput" accept=".jpg, .jpeg, .png, .webp, .jfif, image/*">
+      <input type="file" id="fileInput" accept=".jpg, .jpeg, .png, .webp, .jfif, image/*" style="display:none;">
+      <button type="button" onclick="document.getElementById('fileInput').click()" style="background:#475569; margin-top:10px;">📂 點選此處上傳照片</button>
       
       <div id="previewContainer" style="display:none;">
         <div id="previewTime" class="time"></div>
@@ -80,8 +81,8 @@
       <input type="text" id="customType" placeholder="請手動輸入餐別" style="display:none;">
       
       <label for="locationInput">📍 用餐地點 (選填)</label>
-      <input type="text" id="locationInput" placeholder="例如：麥當勞台北店、某某在地小吃">
-      <button type="button" class="map-btn" onclick="searchOnGoogleMap()">🔍 開啟 Google Map 查詢建議地點</button>
+      <input type="text" id="locationInput" placeholder="輸入店名搜尋，或留白點下方按鈕定位目前位置">
+      <button type="button" class="map-btn" onclick="searchOnGoogleMap()">🔍 開啟 Google Map (輸入店名可搜尋 / 留白可定位當前位置)</button>
       
       <label for="note">📝 飲食備註</label>
       <textarea id="note" rows="3" placeholder="備註（份量、血糖等...）"></textarea>
@@ -140,7 +141,7 @@ let currentPhoto = '';
 let currentPhotoDate = '';
 let currentPhotoFullTime = '';
 
-document.getElementById('photoInput').addEventListener('change', function(e) {
+document.getElementById('fileInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -153,25 +154,43 @@ document.getElementById('photoInput').addEventListener('change', function(e) {
     currentPhoto = evt.target.result;
     document.getElementById('preview').src = currentPhoto;
     document.getElementById('previewContainer').style.display = 'block';
-    document.getElementById('previewTime').innerText = '🕒 辨識到照片時間：' + currentPhotoFullTime;
+    document.getElementById('previewTime').innerText = '📅 拍攝時間：' + currentPhotoFullTime;
   };
   reader.readAsDataURL(file);
 });
 
-// 新增：開啟 Google Map 幫忙找建議地點
+// 智慧 Google Map 按鈕邏輯
 function searchOnGoogleMap() {
-  let query = document.getElementById('locationInput').value.trim();
-  if (!query) {
-    query = prompt("請輸入想搜尋的餐廳名稱或關鍵字（例如：牛肉麵、火鍋）：");
-    if (query) {
-      document.getElementById('locationInput').value = query;
+  const query = document.getElementById('locationInput').value.trim();
+  
+  if (query) {
+    // 1. 如果有輸入文字：直接去 Google Map 搜尋關鍵字
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    window.open(mapUrl, '_blank');
+  } else {
+    // 2. 如果沒有輸入文字：嘗試獲取裝置目前定位經緯度
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          // 直接開啟 Google Map 定位到經緯度並放大 (z=15)
+          const mapUrl = `https://www.google.com/maps/@${lat},${lng},15z`;
+          window.open(mapUrl, '_blank');
+        },
+        function(error) {
+          // 如果使用者拒絕定位或失敗，則開啟預設的 Google Map 頁面
+          console.warn("無法取得定位資訊:", error.message);
+          alert("由於瀏覽器定位權限未開啟或環境限制，改為您開啟預設 Google 地圖。");
+          window.open('https://www.google.com/maps', '_blank');
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
     } else {
-      return;
+      // 瀏覽器不支援定位 API
+      window.open('https://www.google.com/maps', '_blank');
     }
   }
-  // 開啟新分頁連結到 Google 地圖進行搜尋
-  const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-  window.open(mapUrl, '_blank');
 }
 
 function addEntry() {
@@ -180,7 +199,7 @@ function addEntry() {
   const mealType = document.getElementById('mealType').value;
   const customType = document.getElementById('customType').value;
   const note = document.getElementById('note').value;
-  const location = document.getElementById('locationInput').value.trim(); // 抓取地點
+  const location = document.getElementById('locationInput').value.trim();
   const type = mealType === '其他' ? customType : mealType;
 
   const newEntry = {
@@ -188,7 +207,7 @@ function addEntry() {
     date: currentPhotoDate,
     type: type,
     note: note,
-    location: location, // 儲存地點
+    location: location,
     photo: currentPhoto,
     time: currentPhotoFullTime
   };
@@ -255,7 +274,6 @@ function toggleDateDetails(date) {
     results.sort((a, b) => b.id - a.id);
 
     detailsDiv.innerHTML = results.map(e => {
-      // 處理地點顯示：如果有填地點，做出可以直接點擊連回地圖的超連結
       const locationHtml = e.location 
         ? `<div style="margin-top:5px;">📍 地點：<a class="location-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.location)}" target="_blank"> ${e.location} 🌐</a></div>` 
         : '';
@@ -306,8 +324,8 @@ function clearAllData() {
 
 function resetForm() {
   document.getElementById('note').value = '';
-  document.getElementById('locationInput').value = ''; // 清空地點
-  document.getElementById('photoInput').value = '';
+  document.getElementById('locationInput').value = '';
+  document.getElementById('fileInput').value = '';
   document.getElementById('previewContainer').style.display = 'none';
   document.getElementById('customType').value = '';
   document.getElementById('mealType').value = '早餐';
